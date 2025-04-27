@@ -16,5 +16,5 @@
 - Immich (Photos)
 - Syncthing (File Sync)
 ### Other
-- Nix-Darwin for reproducible software enviroment: [see config here](https://github.com/beffiom/dotfiles-macos/tree/main/.config/nix-darwin)
+- Nix-Darwin for reproducible software enviroment: [see config here](https://github.com/beffiom/dotfiles-macos/tree/main)
 - rustdesk and ssh for remote desktop
