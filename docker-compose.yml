@@ -1,0 +1,61 @@
+services:
+  glance:
+    image: glance:latest
+    networks:
+      - homelab
+    ports:
+      - "8280:8280"
+    volumes:
+      - ./volumes/glance:/app/glance.yml
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    environment:
+      DATABASE_URL: postgresql://umami:password@db:5432/umami
+      TRACKER_SCRIPT_NAME: analytics
+    networks:
+      - homelab
+    depends_on:
+      - db
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./volumes/prometheus:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+
+  npm:
+    image: jc21/nginx-proxy-manager
+    ports:
+      - "80:80"
+      - "443:443"
+      - "81:81"
+    volumes:
+      - ./volumes/npm/data:/data
+      - ./volumes/npm/letsencrypt:/etc/letsencrypt
+
+  pihole:
+    image: pihole/pihole:latest
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+    volumes:
+      - ./volumes/pihole/etc:/etc/pihole
+    environment:
+      TZ: America/New_York
+      WEBPASSWORD: pihole
+
+  wireguard:
+    image: linuxserver/wireguard
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./volumes/wireguard/protonvpn-config:/config
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1

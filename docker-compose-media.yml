@@ -1,0 +1,30 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin
+    volumes:
+      - ./volumes/jellyfin/media:/media
+      - ./volumes/jellyfin/config:/config
+    network_mode: host
+    environment:
+      DOCKER_MODS: linuxserver/mods:jellyfin-ffmpeg
+
+  qbittorrent:
+    image: maltyxx/qbittorrent:latest
+    environment:
+      LEGAL: accept
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./volumes/qbittorrent/downloads:/downloads
+      - ./volumes/qbittorrent/incomplete:/incomplete
+      - ./volumes/qbittorrent/config:/config
+
+  immich:
+    image: altran1502/immich-server
+    volumes:
+      - ./volumes/immich/library:/photos
+
+  syncthing:
+    image: syncthing/syncthing
+    volumes:
+      - ./volumes/syncthing/sync:/var/syncthing
