@@ -13,8 +13,8 @@ services:
     volumes:
       - $SSD1/media/audio/audiobooks/audiobookshelf:/audiobooks:z
       - $SSD1/media/audio/podcasts/audiobookshelf:/podcasts:z
-      - ./volumes/audiobookshelf/config:/config:z
-      - ./volumes/audiobookshelf/metadata:/metadata:z
+      - ./volumes/media/audiobookshelf/config:/config:z
+      - ./volumes/media/audiobookshelf/metadata:/metadata:z
     environment:
       - TZ=${TZ}
     restart: unless-stopped
@@ -25,7 +25,7 @@ services:
     environment:
       - TZ=${TZ}
     volumes:
-      - ./volumes/jellyfin:/config:z
+      - ./volumes/media/jellyfin:/config:z
       - $SSD1/shows:/data/tvshows:z
       - $SSD2/media/video/films:/data/movies:z
     ports:
@@ -54,7 +54,7 @@ services:
     container_name: readeck
     image: codeberg.org/readeck/readeck:latest
     volumes:
-      - ./volumes/readeck:/readeck:z
+      - ./volumes/media/readeck:/readeck:z
     ports:
       - 8000:8000
     restart: unless-stopped
@@ -228,7 +228,14 @@ services:
   #prometheus:
   #glance:
   #grafana:
-  #mafl:
+  mafl:
+    container_name: mafl # change as needed
+    image: docker.io/hywax/mafl
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./volumes/monitoring/mafl:/app/data:z
+    restart: unless-stopped
   #tracearr:
   #uptime-kuma:
 
