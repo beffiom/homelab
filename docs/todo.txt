@@ -1,0 +1,9 @@
+- [ ] Create Backup Strategy
+- [ ] Configure Mafl
+- [ ] Configure Tailscale
+- [ ] Configure Authentik SSO
+- [ ] Configure Flaresolver, Gluetun, and Qbittorrent
+- [ ] Configure AudiobookRequest, Prowlarr, Sonarr, Radarr, Bazarr
+- [ ] Configure Jellyfin, Audiobookshelf, Readeck, Miniflux, TubeArchivist, Kiwix
+- [ ] Configure Seerr, Tracearr
+- [ ] Configure Remaining Services

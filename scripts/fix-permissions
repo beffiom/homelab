@@ -1,0 +1,7 @@
+#!/bin/sh
+file_path="$1"
+set -x
+sudo chown -R $USER:$USER "$file_path"
+sudo chcon -R -t container_file_t "$file_path"
+sudo chmod -R 777 "$file_path"
+#set +x
