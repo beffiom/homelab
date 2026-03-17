@@ -11,8 +11,8 @@ services:
     ports:
       - 13378:80
     volumes:
-      - $SSD1/media/audio/audiobooks/audiobookshelf:/audiobooks:z
-      - $SSD1/media/audio/podcasts/audiobookshelf:/podcasts:z
+      - ${SSD1}/media/audio/audiobooks/audiobookshelf:/audiobooks:z
+      - ${SSD1}/media/audio/podcasts/audiobookshelf:/podcasts:z
       - ./volumes/media/audiobookshelf/config:/config:z
       - ./volumes/media/audiobookshelf/metadata:/metadata:z
     environment:
@@ -26,13 +26,27 @@ services:
       - TZ=${TZ}
     volumes:
       - ./volumes/media/jellyfin:/config:z
-      - $SSD1/shows:/data/tvshows:z
-      - $SSD2/media/video/films:/data/movies:z
+      - ${SSD1}/shows:/data/tvshows:z
+      - ${SSD2}/media/video/films:/data/movies:z
     ports:
       - 8096:8096
       - 8920:8920 #optional - 7359:7359/udp #optional
       - 1900:1900/udp #optional
     restart: unless-stopped
+
+  jellyfin-meilisearch:
+     container_name: jellyfin-meilisearch
+     image: docker.io/getmeili/meilisearch:latest
+     environment:
+       MEILI_ENV: production
+       MEILI_NO_ANALYTICS: "true"
+       MEILI_MASTER_KEY: ${JF_MEILI_MASTER_KEY}
+     volumes:
+       # meilisearch's data
+       - ./volumes/media/jellyfin/meilisearch/data:/meili_data:z
+     ports:
+       - 7700:7700
+     restart: unless-stopped
 
   #kavita:
 
@@ -40,7 +54,7 @@ services:
     container_name: kiwix
     image: ghcr.io/kiwix/kiwix-serve
     volumes:
-      - $SSD1/media/sites/zim:/data:z
+      - ${SSD1}/media/sites/zim:/data:z
     ports:
       - '39237:8080'
     command: '*.zim'

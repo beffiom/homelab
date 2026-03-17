@@ -40,3 +40,14 @@ export MEDIA ARR SERVICES TOOLS STORAGE NETWORKING MONITORING SECURITY
 		echo "podman-compose down $$SERVICES_LIST # group $$BASE"; \
 		podman-compose down $$SERVICES_LIST; \
 	fi;
+
+all-up all-down:
+	if echo "$(@)" | grep -q "up"; then \
+		echo "podman-compose up -d"; \
+		podman-compose up -d; \
+	else \
+		echo "podman-compose down"; \
+		podman-compose down; \
+	fi;
+
+
