@@ -1,4 +1,9 @@
 version: '3.9'
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.89.0.0/24
 services:
   #######################################################
   #-----------------------------------------------------#
@@ -28,10 +33,21 @@ services:
       - ./volumes/media/jellyfin:/config:z
       - ${SSD2}/shows:/data/tvshows:z
       - ${SSD1}/media/video/films:/data/movies:z
+      - ${SSD1}/media/audio/music:/data/music:z
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab_default"
+      - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.${DOMAIN}`)"
+      - "traefik.http.routers.jellyfin.entrypoints=websecure"
+      - "traefik.http.routers.jellyfin.tls=true"
+      - "traefik.http.services.jellyfin.loadbalancer.server.url=http://10.89.0.3:8096"
     ports:
-      - 8096:8096
-      - 8920:8920 #optional - 7359:7359/udp #optional
-      - 1900:1900/udp #optional
+      - 127.0.0.1:8096:8096
+      - 127.0.0.1:8920:8920
+      - 127.0.0.1:1900:1900/udp
+    networks:
+      default:
+        ipv4_address: 10.89.0.3
     restart: unless-stopped
 
   jellyfin-meilisearch:
@@ -70,7 +86,7 @@ services:
     volumes:
       - ./volumes/media/readeck:/readeck:z
     ports:
-      - 8000:8000
+      - 36787:8000
     restart: unless-stopped
 
   #romm:
@@ -229,10 +245,49 @@ services:
   #-----------------------------------------------------#
   #######################################################
   #adguardhome:
+  cloudflared:
+    container_name: cloudflared
+    image: docker.io/cloudflare/cloudflared:latest
+    network_mode: host
+    command: tunnel --no-autoupdate run lab-tunnel
+    volumes:
+      - ./volumes/networking/cloudflared:/etc/cloudflared:z
+    restart: unless-stopped
   #flaresolver:
   #gluetun:
   #qbittorrent:
   #traefik:
+  traefik:
+    container_name: traefik
+    image: docker.io/traefik:latest
+    command: |
+      --providers.docker=true
+      --providers.docker.exposedbydefault=false
+      --providers.docker.network=homelab_default
+      --entrypoints.web.address=:8000
+      --entrypoints.websecure.address=:8443
+      --certificatesresolvers.cloudflare.acme.email=${CLOUDFLARE_ACME_EMAIL}
+      --certificatesresolvers.cloudflare.acme.dnschallenge=true
+      --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
+      --api.insecure=true
+      --api.dashboard=true
+      --accesslog=true
+      --log.level=DEBUG
+    labels:
+      - "traefik.enable=true"
+    security_opt:
+      - label=disable
+    volumes:
+      - ./volumes/networking/traefik/dynamic:/dynamic:ro,z
+      - /run/user/1000/podman/podman.sock:/var/run/docker.sock:z
+    ports:
+      - "8443:8443"  # 0.0.0.0 not 127.0.0.1
+      - "8000:8000"
+      - "8080:8080"
+    networks:
+      default:
+        ipv4_address: 10.89.0.13
+    restart: always
   
   #######################################################
   #-----------------------------------------------------#
@@ -260,3 +315,27 @@ services:
   #######################################################
   #aliasvault:
   #authentik:
+  #  container_name: authentik
+  #  image: ghcr.io/goauthentik/server:latest
+  #  labels:
+  #    - "traefik.enable=true"
+  #    - "traefik.http.routers.authentik.rule=Host(`auth.${DOMAIN}`)"
+  #    - "traefik.http.routers.authentik.entrypoints=websecure"
+  #    - "traefik.http.routers.authentik.tls=true"
+  #    - "traefik.http.services.authentik.loadbalancer.server.port=9000"
+
+  #authentik-proxy:
+  #  container_name: authentik-proxy
+  #  image: ghcr.io/goauthentik/proxy:latest
+  #  environment:
+  #    AUTHENTIK_HOST: https://auth.${DOMAIN} # your public Authentik URL
+  #    AUTHENTIK_TOKEN: "<secret_token_from_authentik_outpost>"
+  #    AUTHENTIK_INSECURE: "false"
+  #    # optional: if internal host differs from external
+  #    # AUTHENTIK_HOST_BROWSER: https://auth.ben-ji.dev
+  #  labels:
+  #    - "traefik.enable=true"
+  #    - "traefik.http.routers.authentik.rule=Host(`auth.${DOMAIN}`) && PathPrefix(`/outpost.goauthentik.io`)"
+  #    - "traefik.http.routers.authentik.entrypoints=websecure"
+  #    - "traefik.http.routers.authentik.tls=true"
+  #    - "traefik.http.services.authentik.loadbalancer.server.port=9000"

@@ -3,7 +3,7 @@ ARR ?= audiobookrequest bazarr prowlarr radarr seerr sonarr soulsolid
 SERVICES ?= archivebox archivebox-scheduler archivebox-sonic cook
 TOOLS ?= it-tools morphos myip
 STORAGE ?= copyparty immich immich-machine-learning immich-db immich-redis paperless paperless-redis
-NETWORKING ?= flaresolverr gluetun qbittorrent
+NETWORKING ?= cloudflared traefik
 MONITORING ?= mafl prometheus tracearr tracearr-db tracearr-redis
 SECURITY ?= authentik vaultwarden
 export MEDIA ARR SERVICES TOOLS STORAGE NETWORKING MONITORING SECURITY
