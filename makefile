@@ -8,7 +8,7 @@ MONITORING ?= mafl prometheus tracearr tracearr-db tracearr-redis
 SECURITY ?= authentik vaultwarden
 export MEDIA ARR SERVICES TOOLS STORAGE NETWORKING MONITORING SECURITY
 
-.PHONY: %-up %-down
+.PHONY: %-up %-down all-up all-down
 
 %-up %-down:
 	@BASE=$$(echo $* | sed 's/-[^d]*$$//'); \
@@ -42,12 +42,10 @@ export MEDIA ARR SERVICES TOOLS STORAGE NETWORKING MONITORING SECURITY
 	fi;
 
 all-up all-down:
-	if echo "$(@)" | grep -q "up"; then \
+	@if echo "$(@)" | grep -q "up"; then \
 		echo "podman-compose up -d"; \
 		podman-compose up -d; \
 	else \
 		echo "podman-compose down"; \
 		podman-compose down; \
 	fi;
-
-
