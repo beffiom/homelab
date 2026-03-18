@@ -166,10 +166,22 @@ services:
       - LOG_LEVEL=debug
       - TZ=${TZ}
       - PORT=5055
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab_default"
+      - "traefik.http.routers.seerr.rule=Host(`seerr.${DOMAIN}`)"
+      - "traefik.http.routers.seerr.entrypoints=websecure"
+      - "traefik.http.routers.seerr.tls=true"
+      #- "traefik.http.routers.seerr.tls.certresolver=cloudflare"
+      - "traefik.http.services.seerr.loadbalancer.server.url=http://10.89.0.35:5055"
+      - "traefik.http.routers.seerr-docker.priority=10"  # Low
     ports:
       - 5055:5055
     volumes:
       - ./volumes/seerr/config:/app/config:z
+    networks:
+      default:
+        ipv4_address: 10.89.0.35
     healthcheck:
       test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
       start_period: 20s
@@ -281,15 +293,15 @@ services:
     restart: unless-stopped
 
   watchyourlan:
-    container_name: watchyourname
+    container_name: watchyourlan
     image: docker.io/aceberg/watchyourlan:latest
     environment:
       TZ: ${TZ}               # required: needs your TZ for correct time
       IFACES: "enp4s0 wlxf4ec3892dd51"  # required: 1 or more interface
     volumes:
-      - ~/.dockerdata/wyl:/data/WatchYourLAN
+      - ./volumes/tools/watchyourlan:/data/WatchYourLAN:z
     ports:
-      - 8850:8850
+      - 8840:8840
     network_mode: host      
     restart: unless-stopped
 
@@ -383,6 +395,8 @@ services:
     container_name: cloudflared
     image: docker.io/cloudflare/cloudflared:latest
     network_mode: host
+    cap_add:
+      - NET_ADMIN  # For ICMP/ping
     command: tunnel --config /etc/cloudflared/config.yml run lab-tunnel
     #command: tunnel --no-autoupdate run lab-tunnel
     volumes:
@@ -457,19 +471,24 @@ services:
       --providers.file.watch=true
       --entrypoints.web.address=:8000
       --entrypoints.websecure.address=:8443
-      --certificatesresolvers.cloudflare.acme.email=${CLOUDFLARE_ACME_EMAIL}
+      --certificatesresolvers.cloudflare.acme.email=${CLOUDFLARE_EMAIL}
       --certificatesresolvers.cloudflare.acme.dnschallenge=true
       --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
+      --certificatesresolvers.cloudflare.acme.storage=/acme.json
       --api.insecure=true
       --api.dashboard=true
       --accesslog=true
       --log.level=DEBUG
+    environment:
+      - CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL}
+      - CLOUDFLARE_DNS_API_TOKEN=${CLOUDFLARE_API_KEY}
     labels:
       - "traefik.enable=true"
     security_opt:
       - label=disable
     volumes:
       - ./volumes/networking/traefik/dynamic:/dynamic:ro,z
+      - ./volumes/networking/traefik/acme.json:/acme.json:z
       - /run/user/1000/podman/podman.sock:/var/run/docker.sock:z
     ports:
       - "8443:8443"  # 0.0.0.0 not 127.0.0.1
