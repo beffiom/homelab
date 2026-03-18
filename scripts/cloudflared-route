@@ -1,0 +1,2 @@
+#!/bin/bash
+cloudflared tunnel route dns lab-tunnel auth.ben-ji.dev jellyfin.ben-ji.dev

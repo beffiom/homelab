@@ -41,6 +41,7 @@ services:
       - "traefik.http.routers.jellyfin.entrypoints=websecure"
       - "traefik.http.routers.jellyfin.tls=true"
       - "traefik.http.services.jellyfin.loadbalancer.server.url=http://10.89.0.3:8096"
+      - "traefik.http.routers.jellyfin-docker.priority=10"  # Low
     ports:
       - 127.0.0.1:8096:8096
       - 127.0.0.1:8920:8920
@@ -101,13 +102,98 @@ services:
   #-----------------------------------------------------#
   #######################################################
 
-  #audiobookrequest:
-  #bazarr:
+  audiobookrequest:
+    container_name: audiobookrequest
+    image: docker.io/markbeep/audiobookrequest:latest
+    environment:
+      - TZ=${TZ}
+    ports:
+      - 35667:8000
+    volumes:
+      - ./volumes/arr/audiobookrequest:/config:z
+
+  bazarr:
+    container_name: bazarr
+    image: lscr.io/linuxserver/bazarr:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+    volumes:
+      - ./volumes/arr/bazarr/config:/config:z
+      - ${SSD2}/shows:/tv:z
+      - ${SSD1}/media/video/films:/movies:z
+    ports:
+      - 6767:6767
+    restart: unless-stopped
+
   #monochrome:
-  #prowlarr:
-  #radarr:
-  #seerr:
-  #sonarr:
+  prowlarr:
+    container_name: prowlarr
+    image: lscr.io/linuxserver/prowlarr:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+    volumes:
+      - ./volumes/arr/prowlarr/data:/config:z
+    ports:
+      - 9696:9696
+    restart: unless-stopped
+
+  radarr:
+    container_name: radarr
+    image: lscr.io/linuxserver/radarr:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+    security_opt:
+      - label=disable
+    volumes:
+      - ./volumes/arr/radarr/data:/config:z
+      - ${SSD1}/media/video/films:/movies:z
+      - ${SSD1}/media/video/films/.downloads:/downloads:z
+    ports:
+      - 7878:7878
+    restart: unless-stopped
+
+  seerr:
+    container_name: seerr
+    image: ghcr.io/seerr-team/seerr:latest
+    init: true
+    environment:
+      - LOG_LEVEL=debug
+      - TZ=${TZ}
+      - PORT=5055
+    ports:
+      - 5055:5055
+    volumes:
+      - ./volumes/seerr/config:/app/config:z
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+      retries: 3
+    restart: unless-stopped
+
+  sonarr:
+    container_name: sonarr
+    image: lscr.io/linuxserver/sonarr:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+    security_opt:
+      - label=disable
+    volumes:
+      - ./volumes/arr/sonarr/data:/config:z
+      - ${SSD2}/shows:/tv:z
+      - ${SSD2}/shows/.downloads:/downloads:z
+    ports:
+      - 8989:8989
+    restart: unless-stopped
   #soulsolid:
 
   #######################################################
@@ -152,12 +238,60 @@ services:
   #-----------------------------------------------------#
   #######################################################
 
-  #it-tools:
-  #language-tool:
-  #morpheus:
-  #myip:
-  #omnitools:
-  #watchyourlan:
+  it-tools:
+    container_name: it-tools
+    image: docker.io/corentinth/it-tools:latest
+    ports:
+      - 40661:80
+    restart: unless-stopped
+
+  languagetool:
+    container_name: languagetool
+    image: docker.io/erikvl87/languagetool
+    environment:
+      - langtool_languageModel=/ngrams   # OPTIONAL: Using ngrams data
+      - Java_Xms=512m                    # OPTIONAL: Setting a minimal Java heap size of 512 mib
+      - Java_Xmx=1g                      # OPTIONAL: Setting a maximum Java heap size of 1 Gib
+    volumes:
+      - ./volumes/tools/languagetool/ngrams/data:/ngrams:z     # OPTIONAL: The location of ngrams data on the local machine
+      - ./volumes/tools/languagetool/logback.xml:/LanguageTool/logback.xml:ro,z  # OPTIONAL: Overwrite the logging configuration
+    ports:
+      - 8010:8010
+    restart: unless-stopped
+
+  morphos:
+    container_name: morphos
+    image: ghcr.io/danvergara/morphos-server:latest
+    ports:
+      - 33245:8080
+    restart: unless-stopped
+
+  myip:
+    container_name: myip
+    image: docker.io/jason5ng32/myip:latest
+    ports:
+      - 18966:18966
+    restart: always
+
+  omni-tools:
+    container_name: omni-tools
+    image: docker.io/iib0011/omni-tools:latest
+    ports:
+      - 37799:80
+    restart: unless-stopped
+
+  watchyourlan:
+    container_name: watchyourname
+    image: docker.io/aceberg/watchyourlan:latest
+    environment:
+      TZ: ${TZ}               # required: needs your TZ for correct time
+      IFACES: "enp4s0 wlxf4ec3892dd51"  # required: 1 or more interface
+    volumes:
+      - ~/.dockerdata/wyl:/data/WatchYourLAN
+    ports:
+      - 8850:8850
+    network_mode: host      
+    restart: unless-stopped
 
   #######################################################
   #-----------------------------------------------------#
@@ -249,14 +383,69 @@ services:
     container_name: cloudflared
     image: docker.io/cloudflare/cloudflared:latest
     network_mode: host
-    command: tunnel --no-autoupdate run lab-tunnel
+    command: tunnel --config /etc/cloudflared/config.yml run lab-tunnel
+    #command: tunnel --no-autoupdate run lab-tunnel
     volumes:
       - ./volumes/networking/cloudflared:/etc/cloudflared:z
     restart: unless-stopped
-  #flaresolver:
-  #gluetun:
-  #qbittorrent:
-  #traefik:
+
+  flaresolverr:
+    container_name: flaresolverr
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    environment:
+      - LOG_LEVEL=info
+    ports:
+      - 8191:8191
+    restart: unless-stopped
+
+  gluetun:
+    container_name: gluetun
+    image: docker.io/qmcgaw/gluetun:latest
+    security_opt:
+      - label=disable
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=windscribe
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=cKfLZjeQdMyLZQwbSHNA6ENWlvzFvl62yC2xHlDuInw=
+      - WIREGUARD_PUBLIC_KEY=7LiZu9B4qzVwl3jKRVs7ivx/BHi/jnSS/GWSuxEClgk=
+      - WIREGUARD_PRESHARED_KEY=3YK70QNSH4hQBiO8jRHQEllhpIXcosu/bPmL+IzDsKE=
+      - WIREGUARD_ADDRESSES=100.122.11.72/32
+      - SERVER_REGIONS=us east
+      - UPDATER_PERIOD=
+      - HTTPPROXY=on
+      - HTTPPROXY_LISTENING_ADDRESS=:8888
+      #- HTTPPROXY_USER=myuser        # optional but recommended
+      #- HTTPPROXY_PASSWORD=mypass    # optional but recommended
+    volumes:
+      - ./volumes/networking/gluetun:/gluetun:z
+    ports:
+      - 44001:44001 # Qbittorent
+      - 8888:8888/tcp   # HTTP proxy
+    restart: always
+
+  qbittorrent:
+    container_name: qbittorrent
+    image: lscr.io/linuxserver/qbittorrent:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+      - WEBUI_PORT=44001
+    security_opt:
+      - label=disable
+    volumes:
+      - ./volumes/networking/qbittorrent/config:/config:z
+      - ${SSD2}/shows/.downloads:/downloads/tv-sonarr:z
+      - ${SSD1}/media/video/films/.downloads:/downloads/movies-radarr:z
+    network_mode: "container:gluetun"
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
   traefik:
     container_name: traefik
     image: docker.io/traefik:latest
@@ -264,6 +453,8 @@ services:
       --providers.docker=true
       --providers.docker.exposedbydefault=false
       --providers.docker.network=homelab_default
+      --providers.file.directory=/dynamic
+      --providers.file.watch=true
       --entrypoints.web.address=:8000
       --entrypoints.websecure.address=:8443
       --certificatesresolvers.cloudflare.acme.email=${CLOUDFLARE_ACME_EMAIL}
@@ -286,7 +477,6 @@ services:
       - "8080:8080"
     networks:
       default:
-        ipv4_address: 10.89.0.13
     restart: always
   
   #######################################################
@@ -317,25 +507,76 @@ services:
   #authentik:
   #  container_name: authentik
   #  image: ghcr.io/goauthentik/server:latest
+  #  command: server
   #  labels:
   #    - "traefik.enable=true"
-  #    - "traefik.http.routers.authentik.rule=Host(`auth.${DOMAIN}`)"
+  #    - "traefik.http.routers.authentik.rule=Host(`auth.${DOMAIN}`)"  # Your Authentik domain
   #    - "traefik.http.routers.authentik.entrypoints=websecure"
-  #    - "traefik.http.routers.authentik.tls=true"
+  #    - "traefik.http.routers.authentik.tls.certresolver=cloudflare"  # Matches your Traefik command
   #    - "traefik.http.services.authentik.loadbalancer.server.port=9000"
+  #  environment:
+  #    AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+  #    AUTHENTIK_REDIS__HOST: authentik-redis
+  #    AUTHENTIK_POSTGRESQL__HOST: authentik-db
+  #    AUTHENTIK_POSTGRESQL__USER: admin
+  #    AUTHENTIK_POSTGRESQL__NAME: admin
+  #    AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD}
+  #    AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOSTRAP_EMAIL}
+  #    AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD}
+  #  volumes:
+  #    - ./volumes/security/authentik/media:/media:z
+  #    - /run/user/1000/podman/podman.sock:/var/run/docker.sock:z
+  #  depends_on:
+  #    - authentik-db
+  #    - authentik-redis
+  #  restart: unless-stopped
+
+  #authentik-db:
+  #  container_name: authentik-db
+  #  image: docker.io/postgres:16-alpine
+  #  environment:
+  #    POSTGRES_USER: admin
+  #    POSTGRES_DB: admin
+  #    POSTGRES_PASSWORD: ${AUTHENTIK_DB_PASSWORD}
+  #  volumes: 
+  #    - ./volumes/security/authentik/db:/var/lib/postgresql/data:z
+  #  restart: unless-stopped
 
   #authentik-proxy:
   #  container_name: authentik-proxy
   #  image: ghcr.io/goauthentik/proxy:latest
   #  environment:
-  #    AUTHENTIK_HOST: https://auth.${DOMAIN} # your public Authentik URL
-  #    AUTHENTIK_TOKEN: "<secret_token_from_authentik_outpost>"
-  #    AUTHENTIK_INSECURE: "false"
-  #    # optional: if internal host differs from external
-  #    # AUTHENTIK_HOST_BROWSER: https://auth.ben-ji.dev
+  #    AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+  #    AUTHENTIK_TOKEN: ${AUTHENTIK_OUTPOST_TOKEN}
+  #    AUTHENTIK_HOST: https://auth.${DOMAIN}
+  #    AUTHENTIK_ERROR_REPORTING__ENABLED: "true"
   #  labels:
   #    - "traefik.enable=true"
-  #    - "traefik.http.routers.authentik.rule=Host(`auth.${DOMAIN}`) && PathPrefix(`/outpost.goauthentik.io`)"
-  #    - "traefik.http.routers.authentik.entrypoints=websecure"
-  #    - "traefik.http.routers.authentik.tls=true"
-  #    - "traefik.http.services.authentik.loadbalancer.server.port=9000"
+  #  restart: unless-stopped
+
+  #authentik-redis:
+  #  container_name: authentik-redis
+  #  image: docker.io/redis:7-alpine
+  #  volumes: 
+  #    - ./volumes/security/authentik/redis:/data:z
+  #  restart: unless-stopped
+
+  #authentik-worker:
+  #  container_name: authentik-worker
+  #  image: ghcr.io/goauthentik/server:latest
+  #  command: worker
+  #  environment:
+  #    AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+  #    AUTHENTIK_REDIS__HOST: authentik-redis
+  #    AUTHENTIK_POSTGRESQL__HOST: authentik-db
+  #    AUTHENTIK_POSTGRESQL__USER: admin
+  #    AUTHENTIK_POSTGRESQL__NAME: admin
+  #    AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD}
+  #    AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOSTRAP_EMAIL}
+  #    AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD}
+  #  volumes: 
+  #    - ./volumes/security/authentik/media:/media:z
+  #  depends_on:
+  #    - authentik-db
+  #    - authentik-redis
+  #  restart: unless-stopped

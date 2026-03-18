@@ -1,7 +1,7 @@
 MEDIA ?= audiobookshelf jellyfin kiwix readeck
 ARR ?= audiobookrequest bazarr prowlarr radarr seerr sonarr soulsolid
 SERVICES ?= archivebox archivebox-scheduler archivebox-sonic cook
-TOOLS ?= it-tools morphos myip
+TOOLS ?= it-tools languagetool morphos myip omni-tools watchyourlan
 STORAGE ?= copyparty immich immich-machine-learning immich-db immich-redis paperless paperless-redis
 NETWORKING ?= cloudflared traefik
 MONITORING ?= mafl prometheus tracearr tracearr-db tracearr-redis
