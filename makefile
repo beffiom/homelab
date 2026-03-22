@@ -5,7 +5,7 @@ STORAGE ?= copyparty immich immich-machine-learning immich-db immich-redis paper
 TRACKING ?= yamtrack yamtrack-db yamtrack-redis
 NETWORKING ?= cloudflared gluetun qbittorrent traefik
 TOOLS ?= it-tools languagetool morphos myip omni-tools watchyourlan
-MONITORING ?= mafl prometheus tracearr tracearr-db tracearr-redis
+MONITORING ?= mafl tracearr tracearr-timescale tracearr-redis uptime-kuma
 SECURITY ?= authentik vaultwarden
 export MEDIA ARR SERVICES TOOLS STORAGE TRACKING NETWORKING MONITORING SECURITY
 
