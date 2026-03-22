@@ -1,0 +1,2 @@
+#!/bin/sh
+sudo rsync -rah --progress --delete /run/media/beffiom/MEDIA/media/homelab /home/beffiom/media/
