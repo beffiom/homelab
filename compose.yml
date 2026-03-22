@@ -89,7 +89,36 @@ services:
     command: '*.zim'
     restart: unless-stopped
 
-  #miniflux:
+  miniflux:
+    container_name: miniflux
+    image: docker.io/miniflux/miniflux:latest
+    environment:
+      - DATABASE_URL=postgres://miniflux:secret@miniflux-db/miniflux?sslmode=disable
+      - RUN_MIGRATIONS=1
+      - CREATE_ADMIN=1
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=${MINIFLUX_ADMIN_PASSWORD}
+    depends_on:
+      miniflux-db:
+        condition: service_healthy
+    ports:
+      - 40897:8080
+    restart: always
+
+  miniflux-db:
+    container_name: miniflux-db
+    image: docker.io/postgres:18
+    environment:
+      - POSTGRES_USER=miniflux
+      - POSTGRES_PASSWORD=${MINIFLUX_DB_PASSWORD}
+      - POSTGRES_DB=miniflux
+    volumes:
+      - miniflux-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "miniflux"]
+      interval: 10s
+      start_period: 30s
+    restart: always
 
   readeck:
     container_name: readeck
@@ -129,10 +158,17 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=${TZ}
+    security_opt:
+      - label=disable
+    privileged: true
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
     volumes:
       - ./volumes/arr/bazarr/config:/config:z
-      - ${EXT_DRIVE}/media/video/shows:/tv:Z
-      - ${EXT_DRIVE}/media/video/films:/movies:Z
+      - ${EXT_DRIVE}/media/video/shows:/tv:rw,Z
+      - ${EXT_DRIVE}/media/video/films:/movies:rw,Z
     ports:
       - 6767:6767
     restart: unless-stopped
@@ -163,8 +199,8 @@ services:
     privileged: true
     volumes:
       - ./volumes/arr/radarr/data:/config:z
-      - ${EXT_DRIVE}/media/video/films:/movies:rw,z
-      - ${EXT_DRIVE}/media/video/films/.downloads:/downloads:rw,z
+      - ${EXT_DRIVE}/media/video/films:/movies:rw,Z
+      - ${EXT_DRIVE}/media/video/films/.downloads:/downloads:rw,Z
     ports:
       - 7878:7878
     restart: unless-stopped
@@ -213,8 +249,8 @@ services:
     privileged: true
     volumes:
       - ./volumes/arr/sonarr/data:/config:z
-      - ${EXT_DRIVE}/media/video/shows:/tv:rw,z
-      - ${EXT_DRIVE}/media/video/shows/.downloads:/downloads:rw,z
+      - ${EXT_DRIVE}/media/video/shows:/tv:rw,Z
+      - ${EXT_DRIVE}/media/video/shows/.downloads:/downloads:rw,Z
     ports:
       - 8989:8989
     restart: unless-stopped
@@ -598,7 +634,15 @@ services:
   #-----------------------------------------------------#
   #######################################################
   #prometheus:
-  #glance:
+  glance:
+    container_name: glance
+    image: docker.io/glanceapp/glance:latest
+    volumes:
+      - ./volumes/monitoring/glance:/app/config:rw,z
+    ports:
+      - 39751:8080
+    restart: unless-stopped
+
   #grafana:
   mafl:
     container_name: mafl # change as needed
