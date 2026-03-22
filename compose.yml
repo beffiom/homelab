@@ -616,42 +616,36 @@ services:
       - 37171:3000
     environment:
       - NODE_ENV=production
-      - PORT=37171
+      - PORT=3000
       - HOST=0.0.0.0
       - TZ=${TZ}
-      - DATABASE_URL=postgres://tracearr:${TRACEARR_DB_PASSWORD:-tracearr}@timescale:5432/tracearr
+      - DATABASE_URL=postgres://tracearr:${TRACEARR_DB_PASSWORD:-tracearr}@tracearr-db:5432/tracearr
       - REDIS_URL=redis://tracearr-redis:6379
       - JWT_SECRET=${TRACEARR_JWT_SECRET}
       - COOKIE_SECRET=${TRACEAR_COOKIE_SECRET}
       - CORS_ORIGIN=*
       - LOG_LEVEL=info
       # - DATABASE_POOL_MAX=50  # Database connection pool size (default: 50)
+      - PUID=1000
+      - PGID=1000
+    security_opt:
+      - label=disable
     volumes:
       - ./volumes/monitoring/tracearr/backup:/data/backup:rw,z
     depends_on:
-      tracearr-timescale:
-        condition: service_healthy
-      tracearr-redis:
-        condition: service_healthy
+      - tracearr-db
+      - tracearr-redis
     restart: unless-stopped
 
-  tracearr-redis:
-    container_name: tracearr-redis
-    image: docker.io/redis:8-alpine
-    command: redis-server --appendonly yes
-    volumes:
-      - ./volumes/monitoring/tracearr/redis:/data:rw,z
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-      
-  tracearr-timescale:
+  tracearr-db:
     # TimescaleDB HA with PostgreSQL 18 - pinned for stability
     image: docker.io/timescale/timescaledb-ha:pg18.1-ts2.25.0
-    container_name: tracearr-timescale
+    container_name: tracearr-db
+    environment:
+      - PUID=1000
+      - PGID=1000
+    security_opt:
+      - label=disable
     shm_size: 512mb  # Required for PostgreSQL shared memory (increase for large imports)
     ulimits:
       nofile:
@@ -665,13 +659,27 @@ services:
       - POSTGRES_PASSWORD=${TRACEAR_DB_PASSWORD:-tracearr}
       - POSTGRES_DB=tracearr
     volumes:
-      - ./volumes/monitoring/tracearr/db:/home/postgres/pgdata/data:rw,z
+      - ./volumes/monitoring/tracearr/db:/home/postgres/pgdata:rw,z
+    restart: unless-stopped
+
+  tracearr-redis:
+    container_name: tracearr-redis
+    image: docker.io/redis:8-alpine
+    command: redis-server --appendonly yes
+    environment:
+      - PUID=1000
+      - PGID=1000
+    security_opt:
+      - label=disable
+    volumes:
+      - ./volumes/monitoring/tracearr/redis:/data:rw,z
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tracearr"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
+      
 
   #uptime-kuma:
   uptime-kuma:
@@ -684,6 +692,7 @@ services:
       - ./volumes/monitoring/uptime-kuma:/app/data:rw,z
     ports:
       - 3001:3001
+    #network-mode: host
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001"]
       interval: 30s
