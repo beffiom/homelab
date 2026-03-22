@@ -13,15 +13,15 @@ services:
   audiobookshelf:
     container_name: audiobookshelf
     image: ghcr.io/advplyr/audiobookshelf:latest
-    ports:
-      - 13378:80
     volumes:
-      - ${SSD1}/media/audio/audiobooks/audiobookshelf:/audiobooks:z
-      - ${SSD1}/media/audio/podcasts/audiobookshelf:/podcasts:z
+      - ${EXT_DRIVE}/media/audio/audiobooks/audiobookshelf:/audiobooks:Z
+      - ${EXT_DRIVE}/media/audio/podcasts/audiobookshelf:/podcasts:Z
       - ./volumes/media/audiobookshelf/config:/config:z
       - ./volumes/media/audiobookshelf/metadata:/metadata:z
     environment:
       - TZ=${TZ}
+    ports:
+      - 13378:80
     restart: unless-stopped
 
   jellyfin:
@@ -29,11 +29,17 @@ services:
     image: docker.io/jellyfin/jellyfin:latest
     environment:
       - TZ=${TZ}
+    security_opt:
+      - label=disable
+    privileged: true
+    devices:
+      - /dev/dri:/dev/dri
     volumes:
       - ./volumes/media/jellyfin:/config:z
-      - ${SSD2}/shows:/data/tvshows:z
-      - ${SSD1}/media/video/films:/data/movies:z
-      - ${SSD1}/media/audio/music:/data/music:z
+      - ./volumes/media/jellyfin/cache:/cache:z
+      - ${EXT_DRIVE}/media/video/shows:/data/tvshows:rw,Z
+      - ${EXT_DRIVE}/media/video/films:/data/movies:rw,Z
+      - ${EXT_DRIVE}/media/audio/music:/data/music:rw,Z
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=homelab_default"
@@ -71,15 +77,13 @@ services:
     container_name: kiwix
     image: ghcr.io/kiwix/kiwix-serve
     volumes:
-      - ${SSD1}/media/sites/zim:/data:z
+      - ${EXT_DRIVE}/media/sites/zim:/data:z
     ports:
       - '39237:8080'
     command: '*.zim'
     restart: unless-stopped
 
   #miniflux:
-
-  #navidrome:
 
   readeck:
     container_name: readeck
@@ -89,8 +93,6 @@ services:
     ports:
       - 36787:8000
     restart: unless-stopped
-
-  #romm:
 
   #romm:
   
@@ -110,7 +112,7 @@ services:
     ports:
       - 35667:8000
     volumes:
-      - ./volumes/arr/audiobookrequest:/config:z
+      - ./volumes/arr/audiobookrequest:/config:Z
 
   bazarr:
     container_name: bazarr
@@ -121,8 +123,8 @@ services:
       - TZ=${TZ}
     volumes:
       - ./volumes/arr/bazarr/config:/config:z
-      - ${SSD2}/shows:/tv:z
-      - ${SSD1}/media/video/films:/movies:z
+      - ${EXT_DRIVE}/media/video/shows:/tv:Z
+      - ${EXT_DRIVE}/media/video/films:/movies:Z
     ports:
       - 6767:6767
     restart: unless-stopped
@@ -150,10 +152,11 @@ services:
       - TZ=${TZ}
     security_opt:
       - label=disable
+    privileged: true
     volumes:
       - ./volumes/arr/radarr/data:/config:z
-      - ${SSD1}/media/video/films:/movies:z
-      - ${SSD1}/media/video/films/.downloads:/downloads:z
+      - ${EXT_DRIVE}/media/video/films:/movies:rw,z
+      - ${EXT_DRIVE}/media/video/films/.downloads:/downloads:rw,z
     ports:
       - 7878:7878
     restart: unless-stopped
@@ -178,7 +181,7 @@ services:
     ports:
       - 5055:5055
     volumes:
-      - ./volumes/seerr/config:/app/config:z
+      - ./volumes/arr/seerr/config:/app/config:z
     networks:
       default:
         ipv4_address: 10.89.0.35
@@ -199,10 +202,11 @@ services:
       - TZ=${TZ}
     security_opt:
       - label=disable
+    privileged: true
     volumes:
       - ./volumes/arr/sonarr/data:/config:z
-      - ${SSD2}/shows:/tv:z
-      - ${SSD2}/shows/.downloads:/downloads:z
+      - ${EXT_DRIVE}/media/video/shows:/tv:rw,z
+      - ${EXT_DRIVE}/media/video/shows/.downloads:/downloads:rw,z
     ports:
       - 8989:8989
     restart: unless-stopped
@@ -233,7 +237,7 @@ services:
   #reactive-resume:
   #searxng:
   #wingfit:
-  
+
   #######################################################
   #-----------------------------------------------------#
   #                      FINANCES                       #
@@ -383,7 +387,42 @@ services:
   #dawarich:
   #lubelogger:
   #traccar:
-  #yamtrack:
+  yamtrack:
+    container_name: yamtrack
+    image: ghcr.io/fuzzygrim/yamtrack
+    depends_on:
+      - yamtrack-db
+      - yamtrack-redis
+    environment:
+      - TZ=${TZ}
+      - SECRET=${YAMTRACK_SECRET}
+      - REDIS_URL=redis://yamtrack-redis:6379
+      - DB_HOST=yamtrack
+      - DB_NAME=yamtrack
+      - DB_USER=yamtrack
+      - DB_PASSWORD=${YAMTRACK_DB_PASSWORD}
+      - DB_PORT=5432
+    ports:
+      - "38809:8000"
+    restart: unless-stopped
+
+  yamtrack-db:
+    container_name: yamtrack-db
+    image: docker.io/postgres:16-alpine
+    environment:
+      - POSTGRES_DB=yamtrack
+      - POSTGRES_USER=yamtrack
+      - POSTGRES_PASSWORD=${YAMTRACK_DB_PASSWORD}
+    volumes:
+      - ./volumes/services/yamtrack/db:/var/lib/postgresql/data:z
+    restart: unless-stopped
+
+  yamtrack-redis:
+    container_name: yamtrack-redis
+    image: docker.io/redis:8-alpine
+    volumes:
+      - ./volumes/services/yamtrack/redis:/data:z
+    restart: unless-stopped
 
   #######################################################
   #-----------------------------------------------------#
@@ -417,18 +456,19 @@ services:
     image: docker.io/qmcgaw/gluetun:latest
     security_opt:
       - label=disable
+    privileged: true
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
     environment:
-      - VPN_SERVICE_PROVIDER=windscribe
+      - VPN_SERVICE_PROVIDER=custom
       - VPN_TYPE=wireguard
       - WIREGUARD_PRIVATE_KEY=cKfLZjeQdMyLZQwbSHNA6ENWlvzFvl62yC2xHlDuInw=
       - WIREGUARD_PUBLIC_KEY=7LiZu9B4qzVwl3jKRVs7ivx/BHi/jnSS/GWSuxEClgk=
       - WIREGUARD_PRESHARED_KEY=3YK70QNSH4hQBiO8jRHQEllhpIXcosu/bPmL+IzDsKE=
       - WIREGUARD_ADDRESSES=100.122.11.72/32
-      - SERVER_REGIONS=us east
+      #- SERVER_REGIONS=us east
       - UPDATER_PERIOD=
       - HTTPPROXY=on
       - HTTPPROXY_LISTENING_ADDRESS=:8888
@@ -436,6 +476,7 @@ services:
       #- HTTPPROXY_PASSWORD=mypass    # optional but recommended
     volumes:
       - ./volumes/networking/gluetun:/gluetun:z
+      - ./volumes/networking/gluetun/wireguard/wg0.conf:/gluetun/wireguard/wg0.conf:ro,z
     ports:
       - 44001:44001 # Qbittorent
       - 8888:8888/tcp   # HTTP proxy
@@ -444,17 +485,20 @@ services:
   qbittorrent:
     container_name: qbittorrent
     image: lscr.io/linuxserver/qbittorrent:latest
+    user: 1000:1000
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=${TZ}
       - WEBUI_PORT=44001
+      - UMASK=0000
     security_opt:
       - label=disable
+    privileged: true
     volumes:
       - ./volumes/networking/qbittorrent/config:/config:z
-      - ${SSD2}/shows/.downloads:/downloads/tv-sonarr:z
-      - ${SSD1}/media/video/films/.downloads:/downloads/movies-radarr:z
+      - ${EXT_DRIVE}/media/video/shows/.downloads:/downloads/tv-sonarr:rw,z
+      - ${EXT_DRIVE}/media/video/films/.downloads:/downloads/movies-radarr:rw,z
     network_mode: "container:gluetun"
     depends_on:
       - gluetun

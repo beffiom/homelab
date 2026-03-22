@@ -1,9 +1,10 @@
 MEDIA ?= audiobookshelf jellyfin kiwix readeck
-ARR ?= audiobookrequest bazarr prowlarr radarr seerr sonarr soulsolid
+ARR ?= audiobookrequest bazarr prowlarr radarr seerr sonarr
 SERVICES ?= archivebox archivebox-scheduler archivebox-sonic cook
-TOOLS ?= it-tools languagetool morphos myip omni-tools watchyourlan
 STORAGE ?= copyparty immich immich-machine-learning immich-db immich-redis paperless paperless-redis
-NETWORKING ?= cloudflared traefik
+TRACKING ?= yamtrack yamtrack-db yamtrack-redis
+NETWORKING ?= cloudflared gluetun qbittorrent traefik
+TOOLS ?= it-tools languagetool morphos myip omni-tools watchyourlan
 MONITORING ?= mafl prometheus tracearr tracearr-db tracearr-redis
 SECURITY ?= authentik vaultwarden
 export MEDIA ARR SERVICES TOOLS STORAGE NETWORKING MONITORING SECURITY
@@ -28,7 +29,7 @@ export MEDIA ARR SERVICES TOOLS STORAGE NETWORKING MONITORING SECURITY
 		SERVICES_LIST="$(MONITORING)"; \
 	elif [ "$$BASE" = "security" ]; then \
 		SERVICES_LIST="$(SECURITY)"; \
-	elif SERVICES=$$(grep -r --include="./*.yml" "container_name:.*$$BASE" . 2>/dev/null | sed -E 's/.*container_name: *([^ ]+).*/\1/' | grep -E "^$$BASE|^$$BASE-" | head -5 | tr '\n' ' '); [ -n "$$SERVICES" ]; then \
+	elif SERVICES=$$(grep "container_name: $$BASE*" compose.yml 2>/dev/null | sed 's/.*container_name: *//;s/ .*//' | tr '\n' ' '); [ -n "$$SERVICES" ]; then \
 		SERVICES_LIST=$$SERVICES; \
 	else \
 		echo "No services for '$$BASE'"; exit 1; \
