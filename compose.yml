@@ -390,20 +390,22 @@ services:
   yamtrack:
     container_name: yamtrack
     image: ghcr.io/fuzzygrim/yamtrack
-    depends_on:
-      - yamtrack-db
-      - yamtrack-redis
     environment:
       - TZ=${TZ}
       - SECRET=${YAMTRACK_SECRET}
       - REDIS_URL=redis://yamtrack-redis:6379
-      - DB_HOST=yamtrack
+      - DB_HOST=yamtrack-db
       - DB_NAME=yamtrack
       - DB_USER=yamtrack
       - DB_PASSWORD=${YAMTRACK_DB_PASSWORD}
       - DB_PORT=5432
+      - REGISTRATION=False
+      - STEAM_API_KEY=${STEAM_API_KEY}
+    depends_on:
+      - yamtrack-db
+      - yamtrack-redis
     ports:
-      - "38809:8000"
+      - 38809:8000
     restart: unless-stopped
 
   yamtrack-db:
