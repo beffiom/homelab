@@ -1,13 +1,13 @@
 MEDIA ?= audiobookshelf jellyfin kiwix readeck
 ARR ?= audiobookrequest bazarr prowlarr radarr seerr sonarr
-SERVICES ?= archivebox archivebox-scheduler archivebox-sonic cook
+SERVICES ?= searxng searxng-redis
 STORAGE ?= copyparty immich immich-machine-learning immich-db immich-redis paperless paperless-redis
 TRACKING ?= yamtrack yamtrack-db yamtrack-redis
 NETWORKING ?= cloudflared gluetun qbittorrent traefik
 TOOLS ?= it-tools languagetool morphos myip omni-tools watchyourlan
 MONITORING ?= mafl prometheus tracearr tracearr-db tracearr-redis
 SECURITY ?= authentik vaultwarden
-export MEDIA ARR SERVICES TOOLS STORAGE NETWORKING MONITORING SECURITY
+export MEDIA ARR SERVICES TOOLS STORAGE TRACKING NETWORKING MONITORING SECURITY
 
 .PHONY: %-up %-down all-up all-down
 
@@ -21,6 +21,8 @@ export MEDIA ARR SERVICES TOOLS STORAGE NETWORKING MONITORING SECURITY
 		SERVICES_LIST="$(ARR)"; \
 	elif [ "$$BASE" = "services" ]; then \
 		SERVICES_LIST="$(SERVICES)"; \
+	elif [ "$$BASE" = "tracking" ]; then \
+		SERVICES_LIST="$(TRACKING)"; \
 	elif [ "$$BASE" = "storage" ]; then \
 		SERVICES_LIST="$(STORAGE)"; \
 	elif [ "$$BASE" = "networking" ]; then \

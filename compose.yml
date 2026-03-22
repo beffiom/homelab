@@ -48,10 +48,16 @@ services:
       - "traefik.http.routers.jellyfin.tls=true"
       - "traefik.http.services.jellyfin.loadbalancer.server.url=http://10.89.0.3:8096"
       - "traefik.http.routers.jellyfin-docker.priority=10"  # Low
+      - "traefik.http.middlewares.jellyfin-compress.compress=true"
+      - "traefik.http.routers.jellyfin.middlewares=jellyfin-compress"
     ports:
       - 127.0.0.1:8096:8096
       - 127.0.0.1:8920:8920
       - 127.0.0.1:1900:1900/udp
+    deploy:
+      resources:
+        limits:
+          memory: 16g
     networks:
       default:
         ipv4_address: 10.89.0.3
@@ -112,7 +118,9 @@ services:
     ports:
       - 35667:8000
     volumes:
-      - ./volumes/arr/audiobookrequest:/config:Z
+      - ./volumes/arr/audiobookrequest:/config:rw,z
+      - ${EXT_DRIVE}/media/audio/audiobooks/.downloads:/downloads/audiobooks:rw,z
+    restart: always
 
   bazarr:
     container_name: bazarr
@@ -235,7 +243,35 @@ services:
   #karoake-eternal:
   #pdfding:
   #reactive-resume:
+
   #searxng:
+  #  container_name: searxng
+  #  image: docker.io/searxng/searxng:latest
+  #  volumes:
+  #    - ./volumes/services/searxng:/etc/searxng:rw,z
+  #    - ./volumes/services/searxng/data:/var/cache/searxng:rw,z
+  #  ports:
+  #    - "127.0.0.1:34347:8080"
+  #  logging:
+  #    driver: "json-file"
+  #    options:
+  #      max-size: "1m"
+  #      max-file: "1"
+  #  restart: unless-stopped
+
+  #searxng-redis:
+  #  container_name: searxng-redis
+  #  image: docker.io/valkey/valkey:8-alpine
+  #  command: valkey-server --save 30 1 --loglevel warning
+  #  volumes:
+  #    - ./volumes/services/searxng/redis:/data:rw,z
+  #  logging:
+  #    driver: "json-file"
+  #    options:
+  #      max-size: "1m"
+  #      max-file: "1"
+  #  restart: unless-stopped
+
   #wingfit:
 
   #######################################################
@@ -374,7 +410,18 @@ services:
       disable: false
     restart: always
   
-  #papra:
+  papra:
+    container_name: papra
+    image: ghcr.io/papra-hq/papra:latest
+    user: 1000:1000
+    environment:
+      AUTH_SECRET: ${PAPRA_AUTH_SECRET}
+      APP_BASE_URL: ${PAPRA_BASE_URL}
+    volumes:
+      - ./volumes/storage/papra:/app/app-data:rw,z
+    ports:
+      - 1221:1221
+    restart: unless-stopped
   #syncthing:
 
   #######################################################
@@ -501,6 +548,7 @@ services:
       - ./volumes/networking/qbittorrent/config:/config:z
       - ${EXT_DRIVE}/media/video/shows/.downloads:/downloads/tv-sonarr:rw,z
       - ${EXT_DRIVE}/media/video/films/.downloads:/downloads/movies-radarr:rw,z
+      - ${EXT_DRIVE}/media/audio/audiobooks/.downloads:/downloads/audiobooks:rw,z
     network_mode: "container:gluetun"
     depends_on:
       - gluetun
@@ -556,12 +604,98 @@ services:
     container_name: mafl # change as needed
     image: docker.io/hywax/mafl
     ports:
-      - '3000:3000'
+      - 3000:3000
     volumes:
       - ./volumes/monitoring/mafl:/app/data:z
     restart: unless-stopped
-  #tracearr:
+
+  tracearr:
+    container_name: tracearr
+    image: ghcr.io/connorgallopo/tracearr:latest
+    ports:
+      - 37171:3000
+    environment:
+      - NODE_ENV=production
+      - PORT=37171
+      - HOST=0.0.0.0
+      - TZ=${TZ}
+      - DATABASE_URL=postgres://tracearr:${TRACEARR_DB_PASSWORD:-tracearr}@timescale:5432/tracearr
+      - REDIS_URL=redis://tracearr-redis:6379
+      - JWT_SECRET=${TRACEARR_JWT_SECRET}
+      - COOKIE_SECRET=${TRACEAR_COOKIE_SECRET}
+      - CORS_ORIGIN=*
+      - LOG_LEVEL=info
+      # - DATABASE_POOL_MAX=50  # Database connection pool size (default: 50)
+    volumes:
+      - ./volumes/monitoring/tracearr/backup:/data/backup:rw,z
+    depends_on:
+      tracearr-timescale:
+        condition: service_healthy
+      tracearr-redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tracearr-redis:
+    container_name: tracearr-redis
+    image: docker.io/redis:8-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - ./volumes/monitoring/tracearr/redis:/data:rw,z
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+      
+  tracearr-timescale:
+    # TimescaleDB HA with PostgreSQL 18 - pinned for stability
+    image: docker.io/timescale/timescaledb-ha:pg18.1-ts2.25.0
+    container_name: tracearr-timescale
+    shm_size: 512mb  # Required for PostgreSQL shared memory (increase for large imports)
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536  # TimescaleDB chunks require many file descriptors
+    # Allow unlimited tuple decompression for migrations on compressed hypertables
+    # Increase lock table size for large imports (Tautulli imports with many TimescaleDB chunks)
+    command: postgres -c timescaledb.max_tuples_decompressed_per_dml_transaction=0 -c max_locks_per_transaction=4096 -c timescaledb.telemetry_level=off
+    environment:
+      - POSTGRES_USER=tracearr
+      - POSTGRES_PASSWORD=${TRACEAR_DB_PASSWORD:-tracearr}
+      - POSTGRES_DB=tracearr
+    volumes:
+      - ./volumes/monitoring/tracearr/db:/home/postgres/pgdata/data:rw,z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracearr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   #uptime-kuma:
+  uptime-kuma:
+    container_name: uptime-kuma
+    image: docker.io/louislam/uptime-kuma:latest
+    environment:
+      - TZ=${TZ}
+      - UMASK=0022
+    volumes:
+      - ./volumes/monitoring/uptime-kuma:/app/data:rw,z
+    ports:
+      - 3001:3001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001"]
+      interval: 30s
+      retries: 3
+      start_period: 10s
+      timeout: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
 
   #######################################################
   #-----------------------------------------------------#

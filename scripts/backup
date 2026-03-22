@@ -1,2 +1,4 @@
 #!/bin/sh
+set -x
 sudo rsync -rah --progress --delete /run/media/beffiom/MEDIA/media/homelab /home/beffiom/media/
+#set +x
