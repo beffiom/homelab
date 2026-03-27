@@ -93,11 +93,16 @@ services:
     container_name: miniflux
     image: docker.io/miniflux/miniflux:latest
     environment:
-      - DATABASE_URL=postgres://miniflux:secret@miniflux-db/miniflux?sslmode=disable
+      - DATABASE_URL=postgres://miniflux:${MINIFLUX_DB_PASSWORD}@miniflux-db/miniflux?sslmode=disable
       - RUN_MIGRATIONS=1
       - CREATE_ADMIN=1
       - ADMIN_USERNAME=admin
       - ADMIN_PASSWORD=${MINIFLUX_ADMIN_PASSWORD}
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+    security_opt:
+      - label=disable
     depends_on:
       miniflux-db:
         condition: service_healthy
@@ -112,8 +117,13 @@ services:
       - POSTGRES_USER=miniflux
       - POSTGRES_PASSWORD=${MINIFLUX_DB_PASSWORD}
       - POSTGRES_DB=miniflux
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ}
+    security_opt:
+      - label=disable
     volumes:
-      - miniflux-db:/var/lib/postgresql
+      - ./volumes/media/miniflux/db:/var/lib/postgresql:rw,z
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "miniflux"]
       interval: 10s
@@ -129,7 +139,50 @@ services:
       - 36787:8000
     restart: unless-stopped
 
-  #romm:
+  romm:
+    container_name: romm
+    image: docker.io/rommapp/romm:latest
+    environment:
+      - DB_HOST=romm-db
+      - DB_NAME=romm # Should match MARIADB_DATABASE in mariadb
+      - DB_USER=romm-user # Should match MARIADB_USER in mariadb
+      - DB_PASSWD=${ROMM_DB_PASSWORD} # Should match MARIADB_PASSWORD in mariadb
+      - ROMM_AUTH_SECRET_KEY=${ROMM_AUTH_SECRET_KEY} # Generate a key with `openssl rand -hex 32`
+      - SCREENSCRAPER_USER=${SCREENSCRAPER_USERNAME} # These are the recommended metadata providers
+      - SCREENSCRAPER_PASSWORD=${SCREENSCRAPER_PASSWORD} # https://docs.romm.app/latest/Getting-Started/Metadata-Providers/#screenscraper
+      - RETROACHIEVEMENTS_API_KEY=${RETROACHIEVEMENTS_API_KEY} # https://docs.romm.app/latest/Getting-Started/Metadata-Providers/#retroachievements
+      - STEAMGRIDDB_API_KEY= # https://docs.romm.app/latest/Getting-Started/Metadata-Providers/#steamgriddb
+      - HASHEOUS_API_ENABLED=true # https://docs.romm.app/latest/Getting-Started/Metadata-Providers/#hasheous
+    volumes:
+      - ./volumes/media/romm/resources:/romm/resources:rw,z
+      - ./volumes/media/romm/redis-data:/redis-data:rw,z
+      - ${EXT_DRIVE}/media/games/emulation:/romm/library:rw,z
+      - ${EXT_DRIVE}/media/games/emulation/saves:/romm/assets:rw,z # Uploaded saves, states, etc.
+      - ./volumes/media/romm/config:/romm/config:rw,z
+    ports:
+      - 42195:8080
+    depends_on:
+      - romm-db
+    restart: unless-stopped
+
+  romm-db:
+    container_name: romm-db
+    image: docker.io/mariadb:latest
+    environment:
+      - MARIADB_ROOT_PASSWORD=${ROMM_DB_ROOT_PASSWORD} # Use a unique, secure password
+      - MARIADB_DATABASE=romm
+      - MARIADB_USER=romm-user
+      - MARIADB_PASSWORD=${ROMM_DB_PASSWORD}
+    volumes:
+      - ./volumes/media/romm/db:/var/lib/mysql:rw,z
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 30s
+      start_interval: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
   
   #tubearchivist:
 
@@ -264,7 +317,6 @@ services:
 
   #beaver:
   #siyuan:
-  #solidtime:
   #wakapi:
   
   #######################################################
@@ -453,8 +505,18 @@ services:
     environment:
       AUTH_SECRET: ${PAPRA_AUTH_SECRET}
       APP_BASE_URL: ${PAPRA_BASE_URL}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab_default"
+      - "traefik.http.routers.papra.rule=Host(`papra.${DOMAIN}`)"
+      - "traefik.http.routers.papra.entrypoints=websecure"
+      - "traefik.http.routers.papra.tls=true"
+      - "traefik.http.services.papra.loadbalancer.server.url=http://10.89.0.20:1221"
     volumes:
       - ./volumes/storage/papra:/app/app-data:rw,z
+    networks:
+      default:
+        ipv4_address: 10.89.0.43
     ports:
       - 1221:1221
     restart: unless-stopped
@@ -688,6 +750,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
+      - TZ=${TZ}
     security_opt:
       - label=disable
     shm_size: 512mb  # Required for PostgreSQL shared memory (increase for large imports)
@@ -713,6 +776,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
+      - TZ=${TZ}
     security_opt:
       - label=disable
     volumes:
