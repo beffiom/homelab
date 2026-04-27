@@ -1,4 +1,4 @@
-MEDIA ?= audiobookshelf jellyfin kiwix readeck
+MEDIA ?= audiobookshelf jellyfin kiwix readeck suwayomi
 ARR ?= audiobookrequest bazarr prowlarr radarr seerr sonarr
 SERVICES ?= searxng searxng-redis
 STORAGE ?= copyparty immich immich-machine-learning immich-db immich-redis paperless paperless-redis

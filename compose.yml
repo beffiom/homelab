@@ -31,36 +31,40 @@ services:
       - TZ=${TZ}
     security_opt:
       - label=disable
+      - seccomp=unconfined  # AMD VA-API needs this
     privileged: true
     devices:
-      - /dev/dri:/dev/dri
+      - /dev/dri:/dev/dri:rw
     volumes:
       - ./volumes/media/jellyfin:/config:z
       - ./volumes/media/jellyfin/cache:/cache:z
       - ${EXT_DRIVE}/media/video/shows:/data/tvshows:rw,Z
       - ${EXT_DRIVE}/media/video/films:/data/movies:rw,Z
       - ${EXT_DRIVE}/media/audio/music:/data/music:rw,Z
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=homelab_default"
-      - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.${DOMAIN}`)"
-      - "traefik.http.routers.jellyfin.entrypoints=websecure"
-      - "traefik.http.routers.jellyfin.tls=true"
-      - "traefik.http.services.jellyfin.loadbalancer.server.url=http://10.89.0.3:8096"
-      - "traefik.http.routers.jellyfin-docker.priority=10"  # Low
-      - "traefik.http.middlewares.jellyfin-compress.compress=true"
-      - "traefik.http.routers.jellyfin.middlewares=jellyfin-compress"
+    ## labels:
+    ##   - "traefik.enable=true"
+    ##   - "traefik.docker.network=homelab_default"
+    ##   - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.${DOMAIN}`)"
+    ##   - "traefik.http.routers.jellyfin.entrypoints=websecure"
+    ##   - "traefik.http.routers.jellyfin.tls=true"
+    ##   - "traefik.http.services.jellyfin.loadbalancer.server.url=http://10.89.0.3:8096"
+    ##   - "traefik.http.routers.jellyfin-docker.priority=10"  # Low
+    ##   - "traefik.http.middlewares.jellyfin-compress.compress=true"
+    ##   - "traefik.http.routers.jellyfin.middlewares=jellyfin-compress"
     ports:
-      - 127.0.0.1:8096:8096
-      - 127.0.0.1:8920:8920
-      - 127.0.0.1:1900:1900/udp
-    deploy:
-      resources:
-        limits:
-          memory: 16g
-    networks:
-      default:
-        ipv4_address: 10.89.0.3
+      ## - 127.0.0.1:8096:8096
+      ## - 127.0.0.1:8920:8920
+      ## - 127.0.0.1:1900:1900/udp
+      - 8096:8096
+      - 8920:8920
+      - 1900:1900/udp
+    ## deploy:
+    ##   resources:
+    ##     limits:
+    ##       memory: 16g
+    ## networks:
+    ##   default:
+    ##     ipv4_address: 10.89.0.3
     restart: unless-stopped
 
   jellyfin-meilisearch:
@@ -183,7 +187,17 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-  
+
+  suwayomi:
+    container_name: suwayomi
+    image: ghcr.io/suwayomi/suwayomi-server:stable
+    volumes: # The order matters! Make sure the downloads is first in the volume list or it will not work!
+      - ${EXT_DRIVE}/media/books/suwayomi/downloads:/home/suwayomi/.local/share/Tachidesk/downloads:z
+      - ${EXT_DRIVE}/media/books/suwayomi/files:/home/suwayomi/.local/share/Tachidesk:z
+    ports:
+      - 4568:4567
+    restart: unless-stopped
+
   #tubearchivist:
 
   #######################################################
@@ -318,7 +332,7 @@ services:
   #beaver:
   #siyuan:
   #wakapi:
-  
+
   #######################################################
   #-----------------------------------------------------#
   #                      SERVICES                       #
@@ -430,7 +444,7 @@ services:
       - ./volumes/tools/watchyourlan:/data/WatchYourLAN:z
     ports:
       - 8840:8840
-    network_mode: host      
+    network_mode: host
     restart: unless-stopped
 
   #######################################################
@@ -497,7 +511,7 @@ services:
     healthcheck:
       disable: false
     restart: always
-  
+
   papra:
     container_name: papra
     image: ghcr.io/papra-hq/papra:latest
@@ -530,7 +544,17 @@ services:
   #adventurelog:
   #airtrail:
   #dawarich:
-  #lubelogger:
+  lubelogger:
+    container_name: lubelogger
+    image: ghcr.io/hargata/lubelogger:latest
+    restart: unless-stopped
+    volumes:
+      - ./volumes/trackers/lubelogger/data:/App/data:Z
+      - ./volumes/trackers/lubelogger/keys:/root/.aspnet/DataProtection-Keys:Z
+    # expose port and/or use serving via traefik
+    ports:
+      - 45603:8080
+
   #traccar:
   yamtrack:
     container_name: yamtrack
@@ -623,11 +647,19 @@ services:
       #- HTTPPROXY_PASSWORD=mypass    # optional but recommended
     volumes:
       - ./volumes/networking/gluetun:/gluetun:z
-      - ./volumes/networking/gluetun/wireguard/wg0.conf:/gluetun/wireguard/wg0.conf:ro,z
+      - ./volumes/networking/gluetun/wireguard/milan.conf:/gluetun/wireguard/wg0.conf:ro,z
     ports:
       - 44001:44001 # Qbittorent
       - 8888:8888/tcp   # HTTP proxy
     restart: always
+
+  isponsorblocktv:
+    container_name: isponsorblocktv
+    image: ghcr.io/dmunozv04/isponsorblocktv
+    network_mode: host
+    volumes:
+      - ./volumes/networking/isponsorblocktv:/app/data:z
+    restart: unless-stopped
 
   qbittorrent:
     container_name: qbittorrent
@@ -689,7 +721,7 @@ services:
     networks:
       default:
     restart: always
-  
+
   #######################################################
   #-----------------------------------------------------#
   #                     MONITORING                      #
@@ -787,7 +819,7 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-      
+
 
   #uptime-kuma:
   uptime-kuma:
@@ -854,7 +886,7 @@ services:
   #    POSTGRES_USER: admin
   #    POSTGRES_DB: admin
   #    POSTGRES_PASSWORD: ${AUTHENTIK_DB_PASSWORD}
-  #  volumes: 
+  #  volumes:
   #    - ./volumes/security/authentik/db:/var/lib/postgresql/data:z
   #  restart: unless-stopped
 
@@ -873,7 +905,7 @@ services:
   #authentik-redis:
   #  container_name: authentik-redis
   #  image: docker.io/redis:7-alpine
-  #  volumes: 
+  #  volumes:
   #    - ./volumes/security/authentik/redis:/data:z
   #  restart: unless-stopped
 
@@ -890,7 +922,7 @@ services:
   #    AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD}
   #    AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOSTRAP_EMAIL}
   #    AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD}
-  #  volumes: 
+  #  volumes:
   #    - ./volumes/security/authentik/media:/media:z
   #  depends_on:
   #    - authentik-db
