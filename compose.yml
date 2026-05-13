@@ -41,16 +41,16 @@ services:
       - ${EXT_DRIVE}/media/video/shows:/data/tvshows:rw,Z
       - ${EXT_DRIVE}/media/video/films:/data/movies:rw,Z
       - ${EXT_DRIVE}/media/audio/music:/data/music:rw,Z
-    ## labels:
-    ##   - "traefik.enable=true"
-    ##   - "traefik.docker.network=homelab_default"
-    ##   - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.${DOMAIN}`)"
-    ##   - "traefik.http.routers.jellyfin.entrypoints=websecure"
-    ##   - "traefik.http.routers.jellyfin.tls=true"
-    ##   - "traefik.http.services.jellyfin.loadbalancer.server.url=http://10.89.0.3:8096"
-    ##   - "traefik.http.routers.jellyfin-docker.priority=10"  # Low
-    ##   - "traefik.http.middlewares.jellyfin-compress.compress=true"
-    ##   - "traefik.http.routers.jellyfin.middlewares=jellyfin-compress"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=homelab_default"
+      - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.${DOMAIN}`)"
+      - "traefik.http.routers.jellyfin.entrypoints=websecure"
+      - "traefik.http.routers.jellyfin.tls=true"
+      - "traefik.http.services.jellyfin.loadbalancer.server.url=http://10.89.0.3:8096"
+      - "traefik.http.routers.jellyfin-docker.priority=10"  # Low
+      - "traefik.http.middlewares.jellyfin-compress.compress=true"
+      - "traefik.http.routers.jellyfin.middlewares=jellyfin-compress"
     ports:
       ## - 127.0.0.1:8096:8096
       ## - 127.0.0.1:8920:8920
@@ -58,13 +58,13 @@ services:
       - 8096:8096
       - 8920:8920
       - 1900:1900/udp
-    ## deploy:
-    ##   resources:
-    ##     limits:
-    ##       memory: 16g
-    ## networks:
-    ##   default:
-    ##     ipv4_address: 10.89.0.3
+    deploy:
+      resources:
+        limits:
+          memory: 16g
+    networks:
+      default:
+        ipv4_address: 10.89.0.3
     restart: unless-stopped
 
   jellyfin-meilisearch:
@@ -81,7 +81,21 @@ services:
        - 7700:7700
      restart: unless-stopped
 
-  #kavita:
+  kavita:
+    container_name: kavita
+    image: docker.io/jvmilazz0/kavita:latest
+    security_opt:
+      - label=disable
+    privileged: true
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - ${EXT_DRIVE}/media/books/books:/books:Z
+      - ${EXT_DRIVE}/media/books/suwayomi/Tachidesk/downloads:/manga:Z
+      - ./volumes/media/kavita:/kavita/config:z
+    ports:
+      - 5000:5000
+    restart: unless-stopped
 
   kiwix:
     container_name: kiwix
@@ -89,7 +103,7 @@ services:
     volumes:
       - ${EXT_DRIVE}/media/sites/zim:/data:z
     ports:
-      - '39237:8080'
+      - 39237:8080
     command: '*.zim'
     restart: unless-stopped
 
@@ -191,11 +205,17 @@ services:
   suwayomi:
     container_name: suwayomi
     image: ghcr.io/suwayomi/suwayomi-server:stable
+    environment:
+      - TZ=${TZ}
+    userns_mode: keep-id
     volumes: # The order matters! Make sure the downloads is first in the volume list or it will not work!
-      - ${EXT_DRIVE}/media/books/suwayomi/downloads:/home/suwayomi/.local/share/Tachidesk/downloads:z
-      - ${EXT_DRIVE}/media/books/suwayomi/files:/home/suwayomi/.local/share/Tachidesk:z
+      - ${EXT_DRIVE}/media/books/suwayomi/Tachidesk/downloads:/home/suwayomi/.local/share/Tachidesk/downloads:Z
+      - ${EXT_DRIVE}/media/books/suwayomi/Tachidesk:/home/suwayomi/.local/share/Tachidesk:z
     ports:
       - 4568:4567
+    #network_mode: "container:gluetun"
+    #depends_on:
+    #  - gluetun
     restart: unless-stopped
 
   #tubearchivist:
@@ -239,6 +259,40 @@ services:
     ports:
       - 6767:6767
     restart: unless-stopped
+
+  komf:
+    container_name: komf
+    image: docker.io/sndxr/komf:latest
+    user: 1000:1000
+    environment:
+      - KOMF_KAVITA_BASE_URI=http://kavita:5000
+      - KOMF_KAVITA_API_KEY=${KOMF_KAVITA_API_KEY}
+      - KOMF_LOG_LEVEL=INFO
+      # optional jvm options. Example config for low memory usage. Runs guaranteed cleanup up every 3600000ms(1hour)
+      - JAVA_TOOL_OPTIONS=-XX:+UnlockExperimentalVMOptions -XX:+UseShenandoahGC -XX:ShenandoahGCHeuristics=compact -XX:ShenandoahGuaranteedGCInterval=3600000 -XX:TrimNativeHeapInterval=3600000
+    volumes:
+      - ./volumes/arr/komf:/config:z
+    ports:
+      - 8085:8085
+    restart: unless-stopped
+
+  metadata-remote:
+    container_name: metadata-remote
+    image: ghcr.io/wow-signal-dev/metadata-remote:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+    ports:
+      - 8338:8338
+    volumes:
+      - ${EXT_DRIVE}/media/audio/music:/music:rw,z
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8338/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   #monochrome:
   prowlarr:
@@ -303,6 +357,21 @@ services:
       interval: 15s
       retries: 3
     restart: unless-stopped
+
+  slskd:
+    container_name: slskd
+    image: docker.io/slskd/slskd
+    user: 1000:1000
+    ports:
+      - 5030:5030
+      - 5031:5031
+      - 50300:50300
+    environment:
+      - SLSKD_REMOTE_CONFIGURATION=true
+    volumes:
+      - ./volumes/arr/slskd:/app:Z
+      - ${EXT_DRIVE}/media/audio/music:/media/music:rw,z
+    restart: always
 
   sonarr:
     container_name: sonarr
@@ -432,6 +501,15 @@ services:
     image: docker.io/iib0011/omni-tools:latest
     ports:
       - 37799:80
+    restart: unless-stopped
+
+  snapotter:
+    container_name: snapotter
+    image: docker.io/snapotter/snapotter:latest
+    volumes:
+      - ./volumes/tools/snapotter:/data:z
+    ports:
+      - 1349:1349
     restart: unless-stopped
 
   watchyourlan:
@@ -647,7 +725,7 @@ services:
       #- HTTPPROXY_PASSWORD=mypass    # optional but recommended
     volumes:
       - ./volumes/networking/gluetun:/gluetun:z
-      - ./volumes/networking/gluetun/wireguard/milan.conf:/gluetun/wireguard/wg0.conf:ro,z
+      - ./volumes/networking/gluetun/wireguard/bend.conf:/gluetun/wireguard/wg0.conf:ro,z
     ports:
       - 44001:44001 # Qbittorent
       - 8888:8888/tcp   # HTTP proxy

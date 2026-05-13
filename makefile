@@ -1,11 +1,12 @@
-MEDIA ?= audiobookshelf jellyfin kiwix readeck suwayomi
-ARR ?= audiobookrequest bazarr prowlarr radarr seerr sonarr
+MEDIA ?= audiobookshelf jellyfin kavita kiwix readeck suwayomi
+ARR ?= audiobookrequest bazarr komf metadata-remote prowlarr radarr seerr sonarr
 SERVICES ?= searxng searxng-redis
-STORAGE ?= copyparty immich immich-machine-learning immich-db immich-redis paperless paperless-redis
-TRACKING ?= yamtrack yamtrack-db yamtrack-redis
-NETWORKING ?= cloudflared gluetun qbittorrent traefik
-TOOLS ?= it-tools languagetool morphos myip omni-tools watchyourlan
-MONITORING ?= mafl tracearr tracearr-db tracearr-redis uptime-kuma
+# STORAGE ?= copyparty immich immich-machine-learning immich-db immich-redis paperless paperless-redis
+STORAGE ?= immich immich-machine-learning immich-db immich-redis papra
+TRACKING ?= lubelogger yamtrack yamtrack-db yamtrack-redis
+NETWORKING ?= cloudflared flaresolverr gluetun qbittorrent traefik
+TOOLS ?= it-tools languagetool morphos myip omni-tools snapotter watchyourlan
+MONITORING ?= glance mafl tracearr tracearr-db tracearr-redis uptime-kuma
 SECURITY ?= authentik vaultwarden
 export MEDIA ARR SERVICES TOOLS STORAGE TRACKING NETWORKING MONITORING SECURITY
 
