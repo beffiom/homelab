@@ -1,3 +1,3 @@
 # homelab
 
-[dashboard](./img/mafl-scrot.png)
+![dashboard](./img/mafl-scrot.png)
