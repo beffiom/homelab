@@ -590,6 +590,21 @@ services:
       disable: false
     restart: always
 
+  obsidian:
+    container_name: obsidian
+    image: lscr.io/linuxserver/obsidian:latest
+    environment:
+        - TZ=${TZ}
+        - PGID=1000
+        - PUID=1000
+    shm_size: 1gb
+    volumes:
+      - ./volumes/storage/obsidian:/config:Z
+    ports:
+        - 6806:3001
+        - 3000:3000
+    restart: unless-stopped
+
   papra:
     container_name: papra
     image: ghcr.io/papra-hq/papra:latest
@@ -611,20 +626,6 @@ services:
         ipv4_address: 10.89.0.43
     ports:
       - 1221:1221
-    restart: unless-stopped
-
-  siyuan:
-    container_name: siyuan
-    image: docker.io/b3log/siyuan:latest
-    command: ['--workspace=/siyuan/workspace/', '--accessAuthCode=${AuthCode}']
-    volumes:
-      - ./volumes/storage/siyuan:/siyuan/workspace:Z
-    environment:
-      - TZ=${TZ}
-      - PUID=1000
-      - PGID=1000
-    ports:
-      - 6806:6806
     restart: unless-stopped
 
   #######################################################
